@@ -15,10 +15,10 @@ from six.moves import urllib
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 
-WORKING_DIRECTORY = "/Users/partheinstein/projects/tensorflow/digit"
-TRAIN_LABELS = WORKING_DIRECTORY + "train.csv"
-TRAIN_IMAGES_DIR = WORKING_DIRECTORY + "train/"
-TEST_IMAGES_DIR = WORKING_DIRECTORY + "test/"
+WORKING_DIRECTORY = "/Users/partheinstein/projects/tensorflow/"
+TRAIN_LABELS = "train.csv"
+TRAIN_IMAGES_DIR = "train/"
+TEST_IMAGES_DIR = "test/"
 rows = 28
 cols = 28
 
@@ -31,20 +31,21 @@ def extract_train_images():
     num_images = 0
     arr = numpy.ndarray(shape=(784, ), dtype=float)
     print("Reading training files...")
-    with open(TRAIN_LABELS, 'rb') as csvfile:
-        reader = csv.reader(csvfile, delimiter=",")
-        for row in reader:
-            f = TRAIN_IMAGES_DIR + row[0]
-            with io.open(f, 'rb') as bytestream:
-                buf = bytestream.read(rows * cols)
-                data = numpy.frombuffer(buf, dtype=numpy.uint8)
-                # data is of shape (784,1)
-                # print(data.shape)
-                arr = numpy.concatenate((arr, data), axis=0)
-                # print(data.shape)
-                # data = data.reshape(num_images, rows, cols, 1)
-                # return data
-                num_images = num_images + 1
+    with zipfile.ZipFile(WORKING_DIRECTORY + "digit.zip", 'r') as digitzip:
+        with digitzip.open(TRAIN_LABELS, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=",")
+            for row in reader:
+                f = TRAIN_IMAGES_DIR + row[0]
+                with digitzip.open(f, 'r') as bytestream:
+                    buf = bytestream.read(rows * cols)
+                    data = numpy.frombuffer(buf, dtype=numpy.uint8)
+                    # data is of shape (784,1)
+                    # print(data.shape)
+                    arr = numpy.concatenate((arr, data), axis=0)
+                    # print(data.shape)
+                    # data = data.reshape(num_images, rows, cols, 1)
+                    # return data
+                    num_images = num_images + 1
 
     print("Reading files done. #files read=", num_images)
     # delete the first random 784 elements
@@ -60,19 +61,24 @@ def extract_train_images():
     return arr
 
 def extract_test_images():
-    dir = os.listdir(TEST_IMAGES_DIR)
-    num_images = len(dir)
-    filenames = []
     arr = numpy.ndarray(shape=(784, ), dtype=float)
     print("Reading test files...")
-    for f in dir:
-        filenames.append(f)
-        with io.open(TEST_IMAGES_DIR + f, 'rb') as bytestream:
-            buf = bytestream.read(rows * cols)
-            data = numpy.frombuffer(buf, dtype=numpy.uint8)
-            arr = numpy.concatenate((arr, data), axis=0)
+    with zipfile.ZipFile(WORKING_DIRECTORY + "digit.zip", 'r') as digitzip:
+        with digitzip.open("test/", 'r') as testFolder:
+            filenames = digitzip.namelist()
+            num_images = 0;
+            for f in filenames:
+                # we only care what is in the test folder
+                if ("test" in f not in "test/"):
+                    num_images = num_images + 1
+                    print(num_images)
+                    filenames.append(f)
+                    with digitzip.open(f, 'r') as bytestream:
+                        buf = bytestream.read(rows * cols)
+                        data = numpy.frombuffer(buf, dtype=numpy.uint8)
+                        arr = numpy.concatenate((arr, data), axis=0)
 
-    print("Reading files done. #files read=", num_images)
+    print("Reading files done. #files r", num_images)
     print("Deleting the first 784 elements...")
     arr = numpy.delete(arr, numpy.arange(784))
     print("After deleting, shape=", arr.shape)
@@ -92,14 +98,15 @@ def dense_to_one_hot(labels_dense, num_classes):
 
 def extract_train_labels():
     """Extract the labels into a 1D uint8 numpy array [index]."""
-
     labels = numpy.ndarray(shape=(1, ), dtype=numpy.uint8)
-    with open(TRAIN_LABELS, 'rb') as csvfile:
-        reader = csv.reader(csvfile, delimiter=",")
-        for row in reader:
-            label = numpy.array([row[1]], dtype=numpy.uint8)
-            # print(label)
-            labels = numpy.concatenate((labels, label), axis=0)
+
+    with zipfile.ZipFile(WORKING_DIRECTORY + "digit.zip", 'r') as digitzip:
+        with digitzip.open(TRAIN_LABELS, 'r') as csvfile:
+            reader = csv.reader(csvfile, delimiter=",")
+            for row in reader:
+                label = numpy.array([row[1]], dtype=numpy.uint8)
+                # print(label)
+                labels = numpy.concatenate((labels, label), axis=0)
     # get rid of the first element (bogus val from initializing ndarray)
     labels = numpy.delete(labels, 0, 0)
     return dense_to_one_hot(labels, 10)
